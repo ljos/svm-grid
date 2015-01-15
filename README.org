@@ -1,3 +1,12 @@
 * SVM-GRID
 
   Grid search for libsvm.
+
+
+  #+BEGIN_SRC sh
+    sort -g -k1,2 svm-grid.out | awk -f group.awk > rates.dat
+    gnuplot -c contour.gp rates.dat BESTC BESTG
+  #+END_SRC
+
+  Note: This isn't fully automatic yet. You need to provide best c and
+  gamma. Planning to integrate the gnuplot stuff with svm-grid.
