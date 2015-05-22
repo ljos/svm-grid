@@ -1,44 +1,68 @@
 #!/usr/bin/env bash
 
-function unused {
-    parallel --plain                                                \
-             --sshloginfile ..                                      \
-             --nonall                                               \
-             --tag                                                  \
-             '[[ -z $(users | sed "s/$USER//") ]] && echo "unused"' \
-        | sed -e 's/\s*unused//'                                    \
-              -e 's/^/4\//'
+while [[ $# > 0 ]]; do
+    KEY="$1"
+    case $KEY in
+	-d|--data)
+	    DATA="$2"
+    esac
+    shift
+done
+
+function hasuser {
+    [[ -z $(users | sed "s/$USERS//" ]] && echo "unused"
 }
 
-function exit_parallel {
-    trap '' SIGINT SIGQUIT
-    parallel --plain                                                \
-             --sshloginfile ..                                      \
-             --nonall                                               \
+export -f hasuser
+
+function unused {
+    parallel --plain				\
+             --sshloginfile ..			\
+             --nonall				\
+             --tag				\
+             hasuser				\
+    | sed -e 's/\s*unused//'			\
+          -e 's/^/4\//'
+}
+
+function exit_parallel {			\
+    trap '' SIGINT SIGQUIT			\
+    parallel --plain				\
+             --sshloginfile ..			\
+             --nonall				\
              'killall -q -u $USER svm-train'
 }
 
-trap 'echo "Ctrl-C detected.";                                      \
-          exit_parallel;                                            \
-          exit 130'                                                 \
+function train {
+    nice svm-train -q				\
+	 -m 1024				\
+	 -h 0					\
+	 -v 5					\
+	 -c $(echo "2^$1" | bc -l)		\
+	 -g $(echo "2^$2" | bc -l)		\
+	 "$(basename "$DATA")"			\
+	| sed 's/Cross .* = //;s/%//'
+}
+
+export -f train
+
+cd /tmp/
+cp "$DATA" .
+
+trap 'echo "Ctrl-C detected.";			\
+      exit_parallel;				\
+      exit 130'					\
      SIGINT SIGQUIT
 
-DATA="$DOKTORGRAD/aggr/chunks.svm.bin"
-
-parallel --plain                                                    \
-         --sshloginfile <(unused)                                   \
-         --filter-hosts                                             \
-         --retries 10                                               \
-         --timeout 28800                                            \
-         --tag                                                      \
-         'nice svm-train -q                                         \
-                         -m 1024                                    \
-                         -h 0                                       \
-                         -v 5                                       \
-                         -c $(echo 2^{1} | bc -l)                   \
-                         -g $(echo 2^{2} | bc -l)                   \
-                 "'$DATA'"                                          \
-              | sed -e "s/Cross .* = //"                            \
-                    -e "s/%//"'                                     \
-         ::: {-5..15..2}                                            \
+parallel --workdir "/tmp"			\
+	 --basefile "$(basename "$DATA")"	\
+	 --line-buffer				\
+	 --plain				\
+         --sshloginfile <(unused)		\
+         --filter-hosts				\
+         --retries 10				\
+         --timeout 28800			\
+         --tag					\
+	 'train {1} {2}'			\
+         ::: {-5..15..2}			\
          ::: {3..-15..-2}
