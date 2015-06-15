@@ -2,8 +2,8 @@
 
 function usage () {
     cat <<EOF
-Usage: svm-grid.sh [-w] DATA
-    -w    Working directory on remote machines.
+Usage: svm-grid.sh [-w DIR] DATA
+    -w DIR    Working directory on remote machines.
 EOF
     exit 0
 }
