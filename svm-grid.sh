@@ -22,22 +22,14 @@ done
 
 shift $(($OPTIND - 1))
 
-if [ -z "$1" ]; then
-    echo "No data file precent."
-    usage
-fi
+DATA=${$1-/dev/stdin}
 
-cp "$1" "$WORKDIR/data.svm.bin"
-
-parallel --plain				\
-	 --sshloginfile ..			\
-	 --nonall				\
-	 "mkdir -p $WORKDIR; hostname"		\
-    | pv --timer --line-mode --bytes	      	\
+parallel --plain							\
+	 --sshloginfile ..						\
+	 --nonall							\
+	 "mkdir -p $WORKDIR; hostname"					\
+    | pv --timer --line-mode --bytes					\
     | cat >/dev/null
-
-cd "$WORKDIR"
-echo "Done."
 
 function unused {
     function hasuser {
@@ -45,54 +37,56 @@ function unused {
     }
     export -f hasuser
 
-    parallel --plain				\
-	     --env hasuser			\
-             --sshloginfile ..			\
-             --nonall				\
-             --tag				\
-             hasuser				\
-	| sed -e 's/\s*unused//'		\
+    parallel --plain							\
+	     --env hasuser						\
+             --sshloginfile ..						\
+             --nonall							\
+             --tag							\
+             hasuser							\
+	| sed -e 's/\s*unused//'					\
               -e 's/^/4\//'
 }
 
 function exit_parallel {
-    trap '' SIGINT SIGQUIT                      \
-    parallel --plain                            \
-             --sshloginfile ..                  \
-             --nonall                           \
-             'killall -q -u $USER svm-train'
+    echo "Ctrl-C detected."
+    echo "Closing all remote processes..."
+    parallel --plain							\
+             --sshloginfile ..						\
+             --nonall							\
+             'killall -q -u $USER svm-train;				\
+              hostname'							\
+	| pv --timer --line-mode --bytes				\
+        | cat >/dev/null
+    exit 130
 }
 
-trap 'echo "Ctrl-C detected.";                  \
-      exit_parallel;                            \
-      exit 130'                                 \
-     SIGINT SIGQUIT
+trap exit_parallel SIGINT SIGQUIT
 
 function train {
-    svm-train  -q				\
-	       -m 1024				\
-	       -h 0				\
-	       -v 5				\
-	       -c $(echo "2^$1" | bc -l)	\
-	       -g $(echo "2^$2" | bc -l)	\
-	       data.svm.bin           		\
+    svm-train  -q							\
+	       -m 1024							\
+	       -h 0							\
+	       -v 5							\
+	       -c $(echo "2^$1" | bc -l)				\
+	       -g $(echo "2^$2" | bc -l)				\
+	       data.svm.bin						\
         | sed 's/Cross .* = //;s/%//'
 }
-
 export -f train
 
-
-parallel --workdir "$WORKDIR"			\
-         --basefile data.svm.bin       		\
-	 --env DATA				\
-	 --env train				\
-         --line-buffer				\
-         --plain				\
-         --sshloginfile <(unused)		\
-         --filter-hosts				\
-         --retries 10				\
-         --timeout 28800			\
-         --tag					\
-         'train {1} {2}'			\
-         ::: {-5..15..2}			\
+cp "$DATA" "$WORKDIR/data.svm.bin"
+cd "$WORKDIR"
+parallel --workdir "$WORKDIR"						\
+         --basefile data.svm.bin					\
+	 --env DATA							\
+	 --env train							\
+         --line-buffer							\
+         --plain							\
+         --sshloginfile <(unused)					\
+         --filter-hosts							\
+         --retries 10							\
+         --timeout 28800						\
+         --tag								\
+         'train {1} {2}'						\
+         ::: {-5..15..2}						\
          ::: {3..-15..-2}

@@ -2,6 +2,10 @@
 
   Grid search for libsvm.
 
+  Requires
+    - GNU Parallel (https://www.gnu.org/software/parallel/)
+    - pv (https://www.ivarch.com/programs/pv.shtml)
+
 
   #+BEGIN_SRC sh
     bash svm-grid.sh > svm-grid.out
@@ -9,10 +13,7 @@
     gnuplot -c contour.gp rates.dat BESTC BESTG
   #+END_SRC
 
-  Note: This isn't fully automatic yet. You also need to change the
-  svm-grid.sh file to take your datafiles, etc. You need to provide
-  best c and gamma. Planning to integrate the gnuplot stuff with
-  svm-grid better.
+
 
   There is also a plan to make the whole script configurable in the
   same way as libsvms grid.py, but I haven't gotten that far yet.
